@@ -1,0 +1,14 @@
+target/
+.env
+.env.*
+!.env.example
+.local/
+.idea/
+*.iml
+*.log
+.DS_Store
+__pycache__/
+*.py[cod]
+docs/
+tools/__pycache__/
+AGENTS.md

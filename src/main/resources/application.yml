@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: smartgn-management-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/smartgn-management-db}
+    username: ${SPRING_DATASOURCE_USERNAME:smartgn_management}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 12
+      connection-init-sql: SET search_path TO management
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 500ms
+      timeout: 500ms
+  flyway:
+    enabled: true
+    schemas: management
+    default-schema: management
+    create-schemas: true
+server:
+  port: ${PORT:8081}
+  error:
+    include-message: never
+    include-stacktrace: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+smartgn:
+  security:
+    jwt-secret: ${JWT_SECRET}
+    jwt-issuer: ${JWT_ISSUER:smartgn-iam-service}
+    jwt-audience: ${JWT_AUDIENCE:}
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:4200}
+  devices:
+    credential-key: ${DEVICE_CREDENTIAL_KEY}
+  telemetry:
+    base-url: ${TELEMETRY_BASE_URL:http://localhost:8090}
+    service-token: ${INTERNAL_SERVICE_TOKEN}
+  broker:
+    base-url: ${EMQX_API_URL:http://localhost:18083/api/v5}
+    api-key: ${EMQX_API_KEY:}
+    api-secret: ${EMQX_API_SECRET:}
+    username: ${EMQX_USERNAME:admin}
+    password: ${EMQX_PASSWORD}
+  retention:
+    maintenance-years: ${MAINTENANCE_RETENTION_YEARS:5}
+    audit-years: ${AUDIT_RETENTION_YEARS:5}

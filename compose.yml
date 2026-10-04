@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:17.6
+    profiles: [database]
+    container_name: smartgn-postgres
+    environment:
+      POSTGRES_DB: smartgn-management-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set a database password}
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d smartgn-management-db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  broker:
+    image: emqx/emqx:5.8.8
+    container_name: smartgn-broker
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: admin
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_PASSWORD:?Set a broker dashboard password}
+      EMQX_API_KEY__BOOTSTRAP_FILE: /opt/emqx/etc/bootstrap-api-keys
+      EMQX_AUTHORIZATION__NO_MATCH: deny
+      EMQX_AUTHORIZATION__CACHE__ENABLE: "false"
+      EMQX_AUTHORIZATION__SOURCES: '[{type = built_in_database, enable = true}]'
+      EMQX_AUTHENTICATION: '[{mechanism = password_based, backend = built_in_database, user_id_type = username}]'
+    ports: ["127.0.0.1:1883:1883", "127.0.0.1:18083:18083"]
+    volumes:
+      - ./.local/emqx-api-keys:/opt/emqx/etc/bootstrap-api-keys:ro
+      - broker-data:/opt/emqx/data
+  telemetry:
+    image: python:3.13-slim
+    container_name: smartgn-telemetry-simulator
+    command: [python, /tools/local-telemetry-simulator.py]
+    environment:
+      TELEMETRY_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set a service token}
+      SIMULATOR_ADMIN_TOKEN: ${SIMULATOR_ADMIN_TOKEN:?Set a separate fixture token}
+      PORT: "8090"
+      SIMULATOR_DB: /data/telemetry.sqlite
+    ports: ["127.0.0.1:8090:8090"]
+    volumes:
+      - ./tools:/tools:ro
+      - simulator-data:/data
+  redis:
+    image: redis:7.4.5-alpine
+    container_name: smartgn-redis
+    command: [redis-server, --save, "", --appendonly, "no"]
+    ports: ["127.0.0.1:6379:6379"]
+  management:
+    build: .
+    container_name: smartgn-management-service
+    env_file: .env
+    environment:
+      PORT: "8081"
+    ports: ["127.0.0.1:${PORT:-8081}:8081"]
+    depends_on: [broker, telemetry, redis]
+volumes:
+  postgres-data:
+  broker-data:
+  simulator-data:
