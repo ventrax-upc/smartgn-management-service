@@ -30,24 +30,35 @@ public class ApplicationConfiguration {
     @Bean SupportService supportService(ManagementStore store, TransactionRunner transactions, Clock clock) {
         return new SupportService(store, transactions, clock);
     }
-    @Bean SnapshotCache snapshotCache(StringRedisTemplate redis, ObjectMapper mapper) { return new RedisSnapshotCache(redis, mapper); }
+    @Bean SnapshotCache snapshotCache(StringRedisTemplate redis, ObjectMapper mapper,
+            @Value("${smartgn.cache.enabled:true}") boolean enabled) {
+        return enabled ? new RedisSnapshotCache(redis, mapper) : SnapshotCache.disabled();
+    }
     @Bean ReportingService reportingService(ManagementStore store, TelemetryGateway telemetry, TransactionRunner transactions, Clock clock, SnapshotCache cache) {
         return new ReportingService(store, telemetry, transactions, clock, cache);
     }
     @Bean TelemetryGateway telemetryGateway(@Value("${smartgn.telemetry.base-url}") String url,
-            @Value("${smartgn.telemetry.service-token}") String token, ObjectMapper mapper) {
-        return new HttpTelemetryGateway(url, token, mapper);
+            @Value("${smartgn.telemetry.service-token}") String token, ObjectMapper mapper,
+            @Value("${smartgn.telemetry.enabled:true}") boolean enabled) {
+        return enabled ? new HttpTelemetryGateway(url, token, mapper) : UnavailableIntegrations.telemetry();
     }
     @Bean BrokerGateway brokerGateway(@Value("${smartgn.broker.base-url}") String url,
-            @Value("${smartgn.broker.api-key}") String key, @Value("${smartgn.broker.api-secret}") String secret, ObjectMapper mapper) {
-        return new EmqxBrokerGateway(url, key, secret, mapper);
+            @Value("${smartgn.broker.api-key}") String key, @Value("${smartgn.broker.api-secret}") String secret, ObjectMapper mapper,
+            @Value("${smartgn.broker.enabled:true}") boolean enabled) {
+        return enabled ? new EmqxBrokerGateway(url, key, secret, mapper) : UnavailableIntegrations.broker();
     }
     @Bean CredentialVault credentialVault(@Value("${smartgn.devices.credential-key}") String key) { return new CredentialVault(key); }
     @Bean InstallationOperations installationOperations(ManagementStore store, TransactionRunner transactions, Clock clock,DeviceOperations devices) {
         return new InstallationOperations(store, transactions, clock,devices);
     }
-    @Bean DeviceOperations deviceOperations(ManagementStore store, TransactionRunner transactions, Clock clock, CredentialVault vault, TelemetryGateway telemetry, ObjectMapper mapper) {
-        return new DeviceOperations(store, transactions, clock, vault, telemetry, mapper);
+    @Bean DeviceOperations deviceOperations(ManagementStore store, TransactionRunner transactions, Clock clock, CredentialVault vault, TelemetryGateway telemetry, ObjectMapper mapper,
+            @Value("${smartgn.devices.operations-enabled:true}") boolean enabled,
+            @Value("${smartgn.telemetry.enabled:true}") boolean telemetryEnabled,
+            @Value("${smartgn.broker.enabled:true}") boolean brokerEnabled) {
+        if (enabled && (!telemetryEnabled || !brokerEnabled)) {
+            throw new IllegalArgumentException("Device operations require both Telemetry and EMQX");
+        }
+        return new DeviceOperations(store, transactions, clock, vault, telemetry, mapper, enabled);
     }
     @Bean DeviceProvisioningWorker deviceProvisioningWorker(ManagementStore store, TransactionRunner transactions, Clock clock,
             CredentialVault vault, TelemetryGateway telemetry, BrokerGateway broker, ObjectMapper mapper) {
@@ -57,7 +68,14 @@ public class ApplicationConfiguration {
         return new OutboxOperations(store,transactions,clock,mapper);
     }
     @Bean @ConditionalOnProperty(name="smartgn.worker.enabled", havingValue="true", matchIfMissing=true)
-    ProvisioningSchedule provisioningSchedule(DeviceProvisioningWorker worker) { return new ProvisioningSchedule(worker); }
+    ProvisioningSchedule provisioningSchedule(DeviceProvisioningWorker worker,
+            @Value("${smartgn.telemetry.enabled:true}") boolean telemetryEnabled,
+            @Value("${smartgn.broker.enabled:true}") boolean brokerEnabled) {
+        if (!telemetryEnabled || !brokerEnabled) {
+            throw new IllegalArgumentException("The provisioning worker requires both Telemetry and EMQX");
+        }
+        return new ProvisioningSchedule(worker);
+    }
     static class ProvisioningSchedule {
         private final DeviceProvisioningWorker worker;
         ProvisioningSchedule(DeviceProvisioningWorker worker) { this.worker=worker; }
