@@ -4,6 +4,18 @@ SmartGN service for managing properties, supply points, technicians, maintenance
 
 User authentication is handled by the [IAM service](https://github.com/ventrax-upc/smartgn-iam-service).
 
+## Architecture
+
+Hexagonal architecture (ports and adapters), organized by business feature. Domain and application logic are separated from REST, database, cache, and external-service adapters. The service owns its PostgreSQL database and uses a transactional outbox for device provisioning.
+
+## Technologies
+
+- Java 21 and Spring Boot 4.1.1.
+- Spring Web MVC for REST APIs and Spring Security with JWT authentication.
+- PostgreSQL, Spring JDBC, and Flyway for persistence and database migrations.
+- Optional Redis caching and adapters for EMQX administration and the Telemetry HTTP API.
+- Maven, Docker, and OpenAPI/Swagger through springdoc.
+
 ## Project structure
 
 ```text

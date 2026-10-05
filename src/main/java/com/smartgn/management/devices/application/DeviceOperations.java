@@ -30,15 +30,22 @@ public final class DeviceOperations {
     private final CredentialVault vault;
     private final TelemetryGateway telemetry;
     private final ObjectMapper mapper;
+    private final boolean operationsEnabled;
 
     public DeviceOperations(ManagementStore store, TransactionRunner transactions, Clock clock,
                             CredentialVault vault, TelemetryGateway telemetry, ObjectMapper mapper) {
+        this(store, transactions, clock, vault, telemetry, mapper, true);
+    }
+
+    public DeviceOperations(ManagementStore store, TransactionRunner transactions, Clock clock,
+                            CredentialVault vault, TelemetryGateway telemetry, ObjectMapper mapper, boolean operationsEnabled) {
         this.store = store;
         this.transactions = transactions;
         this.clock = clock;
         this.vault = vault;
         this.telemetry = telemetry;
         this.mapper = mapper;
+        this.operationsEnabled = operationsEnabled;
     }
 
     public ProvisioningReceipt register(Actor actor, UUID installationId, String serialNumber,
@@ -53,6 +60,7 @@ public final class DeviceOperations {
     public ProvisioningReceipt register(Actor actor, UUID installationId, String serialNumber,
                                        String location, Instant installedAt, String replacementGapReason, UUID correlationId) {
         actor.requireRole(Role.SUPERADMIN);
+        requireOperationsEnabled();
         requireText(serialNumber, "Device serial number", 160);
         requireText(location, "Device location", 300);
         if (installedAt == null || installedAt.isAfter(clock.instant())) {
@@ -129,6 +137,7 @@ public final class DeviceOperations {
     }
     public ProvisioningReceipt rotate(Actor actor, UUID deviceId, UUID correlationId) {
         actor.requireRole(Role.SUPERADMIN);
+        requireOperationsEnabled();
         String plaintext = vault.generate();
         return transactions.run(() -> {
             Device before = store.lockDevice(deviceId).orElseThrow(() -> missing("Device"));
@@ -151,6 +160,7 @@ public final class DeviceOperations {
     }
     public Device revoke(Actor actor, UUID deviceId, UUID correlationId) {
         actor.requireRole(Role.SUPERADMIN);
+        requireOperationsEnabled();
         return transactions.run(() -> {
             Device before = store.lockDevice(deviceId).orElseThrow(() -> missing("Device"));
             if (before.status() == DeviceStatus.REVOKED) return before;
@@ -170,6 +180,7 @@ public final class DeviceOperations {
     public ProvisioningReceipt reassociate(Actor actor, UUID deviceId, UUID installationId,
                                            boolean resolveGap, String resolutionReason, UUID correlationId) {
         actor.requireRole(Role.SUPERADMIN);
+        requireOperationsEnabled();
         Device snapshot = store.findDevice(deviceId).orElseThrow(() -> missing("Device"));
         requireRevoked(snapshot);
         TelemetryGateway.DrainResult drain;
@@ -265,6 +276,7 @@ public final class DeviceOperations {
     /** Called within the installation cancellation transaction, after locking its installation. */
     public void endForCancellation(Actor actor, Installation installation, UUID correlationId) {
         actor.requireRole(Role.SUPERADMIN);
+        requireOperationsEnabled();
         Device device=store.lockDevice(installation.deviceId()).orElseThrow(()->missing("Device"));
         if(!device.installationId().equals(installation.id())) throw new DomainException("CONFLICT","Device has moved to another installation");
         requireRevoked(device);
@@ -299,4 +311,7 @@ public final class DeviceOperations {
         if (value == null || value.isBlank() || value.length() > max) throw new DomainException("INVALID_INPUT", field + " is invalid");
     }
     private static DomainException missing(String resource) { return new DomainException("NOT_FOUND", resource + " was not found"); }
+    private void requireOperationsEnabled() {
+        if (!operationsEnabled) throw new DependencyFailure("Device provisioning");
+    }
 }
