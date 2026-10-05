@@ -1,0 +1,38 @@
+# Activate with SPRING_PROFILES_ACTIVE=render. Neon credentials have no local fallback.
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: 0
+      connection-timeout: 30000
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+server:
+  address: 0.0.0.0
+  port: ${PORT:10000}
+  forward-headers-strategy: framework
+management:
+  health:
+    redis:
+      enabled: ${CACHE_ENABLED:false}
+smartgn:
+  security:
+    allowed-origins: ${ALLOWED_ORIGINS:}
+  cache:
+    enabled: ${CACHE_ENABLED:false}
+  telemetry:
+    enabled: ${TELEMETRY_ENABLED:false}
+    base-url: ${TELEMETRY_BASE_URL:}
+    service-token: ${INTERNAL_SERVICE_TOKEN:}
+  broker:
+    enabled: ${BROKER_ENABLED:false}
+    base-url: ${EMQX_API_URL:}
+    password: ${EMQX_PASSWORD:}
+  devices:
+    operations-enabled: ${WORKER_ENABLED:false}
+  worker:
+    enabled: ${WORKER_ENABLED:false}
